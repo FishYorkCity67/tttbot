@@ -1,0 +1,452 @@
+import React, { useState, useEffect } from 'react';
+import { Switch } from "@/components/ui/switch";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, RotateCcw } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+const PIECES = {
+  white: { king: '♔', queen: '♕', rook: '♖', bishop: '♗', knight: '♘', pawn: '♙' },
+  black: { king: '♚', queen: '♛', rook: '♜', bishop: '♝', knight: '♞', pawn: '♟' }
+};
+
+const PIECE_VALUES = {
+  pawn: 100, knight: 320, bishop: 330, rook: 500, queen: 900, king: 20000
+};
+
+const INITIAL_BOARD = [
+  ['♜', '♞', '♝', '♛', '♚', '♝', '♞', '♜'],
+  ['♟', '♟', '♟', '♟', '♟', '♟', '♟', '♟'],
+  [null, null, null, null, null, null, null, null],
+  [null, null, null, null, null, null, null, null],
+  [null, null, null, null, null, null, null, null],
+  [null, null, null, null, null, null, null, null],
+  ['♙', '♙', '♙', '♙', '♙', '♙', '♙', '♙'],
+  ['♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖']
+];
+
+function getPieceType(piece) {
+  if (!piece) return null;
+  const types = {
+    '♔': 'king', '♚': 'king',
+    '♕': 'queen', '♛': 'queen',
+    '♖': 'rook', '♜': 'rook',
+    '♗': 'bishop', '♝': 'bishop',
+    '♘': 'knight', '♞': 'knight',
+    '♙': 'pawn', '♟': 'pawn'
+  };
+  return types[piece];
+}
+
+function getPieceColor(piece) {
+  if (!piece) return null;
+  return ['♔', '♕', '♖', '♗', '♘', '♙'].includes(piece) ? 'white' : 'black';
+}
+
+function evaluateBoard(board, myColor) {
+  let score = 0;
+  
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const piece = board[row][col];
+      if (!piece) continue;
+      
+      const pieceColor = getPieceColor(piece);
+      const pieceType = getPieceType(piece);
+      let value = PIECE_VALUES[pieceType] || 0;
+      
+      // Position bonuses
+      if (pieceType === 'pawn') {
+        value += (pieceColor === 'white' ? (6 - row) * 10 : (row - 1) * 10);
+      }
+      if (pieceType === 'knight' || pieceType === 'bishop') {
+        if (row >= 2 && row <= 5 && col >= 2 && col <= 5) value += 30;
+      }
+      
+      if (pieceColor === myColor) {
+        score += value;
+      } else {
+        score -= value;
+      }
+    }
+  }
+  
+  return score;
+}
+
+function generateMoves(board, color) {
+  const moves = [];
+  
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const piece = board[row][col];
+      if (!piece || getPieceColor(piece) !== color) continue;
+      
+      const pieceType = getPieceType(piece);
+      const pieceMoves = getPieceMoves(board, row, col, pieceType, color);
+      
+      for (const [toRow, toCol] of pieceMoves) {
+        moves.push({ from: [row, col], to: [toRow, toCol] });
+      }
+    }
+  }
+  
+  return moves;
+}
+
+function getPieceMoves(board, row, col, pieceType, color) {
+  const moves = [];
+  const opponent = color === 'white' ? 'black' : 'white';
+  
+  const isValid = (r, c) => r >= 0 && r < 8 && c >= 0 && c < 8;
+  const isEmpty = (r, c) => !board[r][c];
+  const isOpponent = (r, c) => board[r][c] && getPieceColor(board[r][c]) === opponent;
+  
+  if (pieceType === 'pawn') {
+    const direction = color === 'white' ? -1 : 1;
+    const startRow = color === 'white' ? 6 : 1;
+    
+    if (isValid(row + direction, col) && isEmpty(row + direction, col)) {
+      moves.push([row + direction, col]);
+      if (row === startRow && isEmpty(row + 2 * direction, col)) {
+        moves.push([row + 2 * direction, col]);
+      }
+    }
+    
+    for (const dc of [-1, 1]) {
+      if (isValid(row + direction, col + dc) && isOpponent(row + direction, col + dc)) {
+        moves.push([row + direction, col + dc]);
+      }
+    }
+  }
+  
+  if (pieceType === 'knight') {
+    const knightMoves = [
+      [-2, -1], [-2, 1], [-1, -2], [-1, 2],
+      [1, -2], [1, 2], [2, -1], [2, 1]
+    ];
+    for (const [dr, dc] of knightMoves) {
+      const r = row + dr, c = col + dc;
+      if (isValid(r, c) && (isEmpty(r, c) || isOpponent(r, c))) {
+        moves.push([r, c]);
+      }
+    }
+  }
+  
+  if (pieceType === 'bishop' || pieceType === 'queen') {
+    const directions = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+    for (const [dr, dc] of directions) {
+      for (let i = 1; i < 8; i++) {
+        const r = row + dr * i, c = col + dc * i;
+        if (!isValid(r, c)) break;
+        if (isEmpty(r, c)) {
+          moves.push([r, c]);
+        } else if (isOpponent(r, c)) {
+          moves.push([r, c]);
+          break;
+        } else break;
+      }
+    }
+  }
+  
+  if (pieceType === 'rook' || pieceType === 'queen') {
+    const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    for (const [dr, dc] of directions) {
+      for (let i = 1; i < 8; i++) {
+        const r = row + dr * i, c = col + dc * i;
+        if (!isValid(r, c)) break;
+        if (isEmpty(r, c)) {
+          moves.push([r, c]);
+        } else if (isOpponent(r, c)) {
+          moves.push([r, c]);
+          break;
+        } else break;
+      }
+    }
+  }
+  
+  if (pieceType === 'king') {
+    const directions = [
+      [-1, -1], [-1, 0], [-1, 1], [0, -1],
+      [0, 1], [1, -1], [1, 0], [1, 1]
+    ];
+    for (const [dr, dc] of directions) {
+      const r = row + dr, c = col + dc;
+      if (isValid(r, c) && (isEmpty(r, c) || isOpponent(r, c))) {
+        moves.push([r, c]);
+      }
+    }
+  }
+  
+  return moves;
+}
+
+function minimax(board, depth, isMaximizing, myColor, alpha, beta) {
+  if (depth === 0) {
+    return evaluateBoard(board, myColor);
+  }
+  
+  const opponent = myColor === 'white' ? 'black' : 'white';
+  const moves = generateMoves(board, isMaximizing ? myColor : opponent);
+  
+  if (moves.length === 0) {
+    return evaluateBoard(board, myColor);
+  }
+  
+  if (isMaximizing) {
+    let maxEval = -Infinity;
+    for (const move of moves) {
+      const newBoard = board.map(row => [...row]);
+      const capturedPiece = newBoard[move.to[0]][move.to[1]];
+      newBoard[move.to[0]][move.to[1]] = newBoard[move.from[0]][move.from[1]];
+      newBoard[move.from[0]][move.from[1]] = null;
+      
+      const eval_score = minimax(newBoard, depth - 1, false, myColor, alpha, beta);
+      maxEval = Math.max(maxEval, eval_score);
+      alpha = Math.max(alpha, eval_score);
+      
+      if (beta <= alpha) break;
+    }
+    return maxEval;
+  } else {
+    let minEval = Infinity;
+    for (const move of moves) {
+      const newBoard = board.map(row => [...row]);
+      newBoard[move.to[0]][move.to[1]] = newBoard[move.from[0]][move.from[1]];
+      newBoard[move.from[0]][move.from[1]] = null;
+      
+      const eval_score = minimax(newBoard, depth - 1, true, myColor, alpha, beta);
+      minEval = Math.min(minEval, eval_score);
+      beta = Math.min(beta, eval_score);
+      
+      if (beta <= alpha) break;
+    }
+    return minEval;
+  }
+}
+
+function findBestMove(board, myColor) {
+  const moves = generateMoves(board, myColor);
+  if (moves.length === 0) return null;
+  
+  let bestMove = moves[0];
+  let bestScore = -Infinity;
+  
+  for (const move of moves) {
+    const newBoard = board.map(row => [...row]);
+    const capturedPiece = newBoard[move.to[0]][move.to[1]];
+    newBoard[move.to[0]][move.to[1]] = newBoard[move.from[0]][move.from[1]];
+    newBoard[move.from[0]][move.from[1]] = null;
+    
+    // Prioritize captures
+    let score = minimax(newBoard, 3, false, myColor, -Infinity, Infinity);
+    if (capturedPiece) {
+      const captureValue = PIECE_VALUES[getPieceType(capturedPiece)] || 0;
+      score += captureValue * 0.1;
+    }
+    
+    if (score > bestScore) {
+      bestScore = score;
+      bestMove = move;
+    }
+  }
+  
+  return bestMove;
+}
+
+export default function Chess() {
+  const [board, setBoard] = useState(INITIAL_BOARD.map(row => [...row]));
+  const [myColor, setMyColor] = useState('white');
+  const [selectedSquare, setSelectedSquare] = useState(null);
+  const [autoPlay, setAutoPlay] = useState(false);
+  const [bestMove, setBestMove] = useState(null);
+  const [lastOpponentMove, setLastOpponentMove] = useState(null);
+
+  const opponent = myColor === 'white' ? 'black' : 'white';
+
+  useEffect(() => {
+    const move = findBestMove(board, myColor);
+    setBestMove(move);
+  }, [board, myColor]);
+
+  useEffect(() => {
+    if (autoPlay && bestMove && lastOpponentMove) {
+      const timer = setTimeout(() => {
+        const newBoard = board.map(row => [...row]);
+        newBoard[bestMove.to[0]][bestMove.to[1]] = newBoard[bestMove.from[0]][bestMove.from[1]];
+        newBoard[bestMove.from[0]][bestMove.from[1]] = null;
+        setBoard(newBoard);
+        setLastOpponentMove(null);
+        setSelectedSquare(null);
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [autoPlay, bestMove, lastOpponentMove, board]);
+
+  const handleSquareClick = (row, col) => {
+    if (selectedSquare) {
+      const newBoard = board.map(r => [...r]);
+      newBoard[row][col] = newBoard[selectedSquare[0]][selectedSquare[1]];
+      newBoard[selectedSquare[0]][selectedSquare[1]] = null;
+      setBoard(newBoard);
+      
+      const movedPiece = newBoard[row][col];
+      if (movedPiece && getPieceColor(movedPiece) === opponent) {
+        setLastOpponentMove([row, col]);
+      }
+      
+      setSelectedSquare(null);
+    } else if (board[row][col]) {
+      setSelectedSquare([row, col]);
+    }
+  };
+
+  const handleRemovePiece = (row, col) => {
+    const newBoard = board.map(r => [...r]);
+    newBoard[row][col] = null;
+    setBoard(newBoard);
+    setSelectedSquare(null);
+  };
+
+  const resetBoard = () => {
+    setBoard(INITIAL_BOARD.map(row => [...row]));
+    setSelectedSquare(null);
+    setBestMove(null);
+    setLastOpponentMove(null);
+  };
+
+  const isHighlighted = (row, col) => {
+    if (!bestMove) return false;
+    return (bestMove.from[0] === row && bestMove.from[1] === col) ||
+           (bestMove.to[0] === row && bestMove.to[1] === col);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0f0f1a] flex flex-col items-center justify-between py-4 px-4">
+      <div className="w-full max-w-md">
+        <div className="flex items-center justify-between mb-4">
+          <Link to="/Index">
+            <button className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all">
+              <ArrowLeft className="w-5 h-5 text-gray-400" />
+            </button>
+          </Link>
+          <h1 className="text-xl font-bold text-white">Chess Helper</h1>
+          <div className="w-10" />
+        </div>
+
+        <div className="flex items-center justify-between mb-6">
+          <span className="text-gray-400 text-sm font-medium">I am</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setMyColor('white')}
+              className={`px-4 h-10 rounded-xl text-sm font-medium transition-all ${
+                myColor === 'white'
+                  ? 'bg-gray-200 text-gray-900 ring-2 ring-gray-300'
+                  : 'bg-white/5 text-gray-500 hover:bg-white/10'
+              }`}
+            >
+              White
+            </button>
+            <button
+              onClick={() => setMyColor('black')}
+              className={`px-4 h-10 rounded-xl text-sm font-medium transition-all ${
+                myColor === 'black'
+                  ? 'bg-gray-800 text-white ring-2 ring-gray-600'
+                  : 'bg-white/5 text-gray-500 hover:bg-white/10'
+              }`}
+            >
+              Black
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative mb-4">
+        <div className="grid grid-cols-8 gap-0 border-4 border-gray-800 rounded-lg overflow-hidden">
+          {(myColor === 'black' ? [...board].reverse() : board).map((row, rowIndex) =>
+            (myColor === 'black' ? [...row].reverse() : row).map((piece, colIndex) => {
+              const actualRow = myColor === 'black' ? 7 - rowIndex : rowIndex;
+              const actualCol = myColor === 'black' ? 7 - colIndex : colIndex;
+              const isLight = (actualRow + actualCol) % 2 === 0;
+              const isSelected = selectedSquare && selectedSquare[0] === actualRow && selectedSquare[1] === actualCol;
+              const highlighted = isHighlighted(actualRow, actualCol);
+              
+              return (
+                <motion.button
+                  key={`${actualRow}-${actualCol}`}
+                  onClick={() => handleSquareClick(actualRow, actualCol)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    if (piece) handleRemovePiece(actualRow, actualCol);
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`w-10 h-10 flex items-center justify-center text-3xl relative transition-all ${
+                    isLight ? 'bg-amber-100' : 'bg-amber-800'
+                  } ${isSelected ? 'ring-4 ring-blue-400 ring-inset' : ''} ${
+                    highlighted ? 'ring-4 ring-emerald-400 ring-inset' : ''
+                  }`}
+                >
+                  <AnimatePresence mode="wait">
+                    {piece && (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        exit={{ scale: 0 }}
+                        className={`drop-shadow-md ${
+                          getPieceColor(piece) === 'white' 
+                            ? 'text-white' 
+                            : 'text-gray-900'
+                        }`}
+                        style={{
+                          filter: getPieceColor(piece) === 'white' 
+                            ? 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' 
+                            : 'drop-shadow(0 0 1px rgba(255,255,255,0.3))',
+                          WebkitTextStroke: getPieceColor(piece) === 'white' 
+                            ? '1px rgba(0,0,0,0.3)' 
+                            : '0.5px rgba(0,0,0,0.8)'
+                        }}
+                      >
+                        {piece}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </motion.button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <div className="w-full max-w-md space-y-4">
+        <div className="text-center h-6">
+          {bestMove ? (
+            <p className="text-emerald-400 text-sm font-medium">
+              Move: {String.fromCharCode(97 + bestMove.from[1])}{8 - bestMove.from[0]} → {String.fromCharCode(97 + bestMove.to[1])}{8 - bestMove.to[0]}
+            </p>
+          ) : (
+            <p className="text-gray-500 text-xs">Tap pieces to move them</p>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between bg-white/5 rounded-2xl px-5 py-3">
+          <div>
+            <p className="text-white text-sm font-medium">Auto-play</p>
+            <p className="text-gray-500 text-xs">Auto-fill my best move</p>
+          </div>
+          <Switch
+            checked={autoPlay}
+            onCheckedChange={setAutoPlay}
+            className="data-[state=checked]:bg-indigo-500"
+          />
+        </div>
+
+        <button
+          onClick={resetBoard}
+          className="w-full py-3 rounded-xl bg-white/5 text-gray-400 text-sm font-medium hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+        >
+          <RotateCcw className="w-4 h-4" />
+          Reset Board
+        </button>
+      </div>
+    </div>
+  );
+}

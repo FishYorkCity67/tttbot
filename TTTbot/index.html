@@ -1,0 +1,103 @@
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Grid3x3, Crown, Zap } from 'lucide-react';
+import { motion } from 'framer-motion';
+
+export default function Index() {
+  const [tttMode, setTttMode] = useState('normal');
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#0f0f1a] via-[#1a1a2e] to-[#0f0f1a] flex flex-col items-center justify-center p-6">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center mb-12"
+      >
+        <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-rose-400 mb-2">
+          Super TTT
+        </h1>
+        <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-purple-400 to-blue-400">
+          and Chess Cheater
+        </h2>
+        <p className="text-gray-500 mt-4 text-sm">Never lose again 😎</p>
+      </motion.div>
+
+      <div className="flex flex-col gap-4 w-full max-w-sm">
+        <div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-2xl p-6"
+          >
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                <Grid3x3 className="w-6 h-6 text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-white">Tic Tac Toe</h3>
+                <p className="text-gray-400 text-xs">Master the 3x3 grid</p>
+              </div>
+            </div>
+            
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={() => setTttMode('normal')}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                  tttMode === 'normal'
+                    ? 'bg-blue-500/30 text-blue-300 ring-2 ring-blue-400/50'
+                    : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                }`}
+              >
+                Normal
+              </button>
+              <button
+                onClick={() => setTttMode('rush')}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1 ${
+                  tttMode === 'rush'
+                    ? 'bg-purple-500/30 text-purple-300 ring-2 ring-purple-400/50'
+                    : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                }`}
+              >
+                <Zap className="w-3 h-3" />
+                Rush
+              </button>
+            </div>
+            
+            <Link to={`/TicTacToe?mode=${tttMode}`}>
+              <button className="w-full py-3 rounded-xl bg-blue-500/20 text-blue-300 font-medium hover:bg-blue-500/30 transition-all">
+                Play
+              </button>
+            </Link>
+          </motion.div>
+        </div>
+
+        <Link to="/Chess">
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="bg-gradient-to-br from-rose-500/10 to-orange-500/10 border border-rose-500/30 rounded-2xl p-8 hover:border-rose-400/50 transition-all cursor-pointer group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl bg-rose-500/20 flex items-center justify-center group-hover:bg-rose-500/30 transition-all">
+                <Crown className="w-8 h-8 text-rose-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold text-white mb-1">Chess</h3>
+                <p className="text-gray-400 text-sm">Dominate the 64 squares</p>
+              </div>
+            </div>
+          </motion.div>
+        </Link>
+      </div>
+
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+        className="text-gray-600 text-xs mt-8"
+      >
+        For educational purposes only 🎓
+      </motion.p>
+    </div>
+  );
+}
